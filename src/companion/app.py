@@ -18,11 +18,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def get_instances_dir() -> str:
     path = os.environ.get("COMPANION_INSTANCES_DIR")
     if not path:
         path = os.path.expanduser("~/curseforge/minecraft/Instances")
     return os.path.abspath(path)
+
 
 @app.get("/profiles")
 def list_profiles() -> List[Dict[str, Any]]:
@@ -49,12 +51,12 @@ def list_profiles() -> List[Dict[str, Any]]:
                 continue
 
             manifest = data.get("manifest")
-            
+
             # Extract basic details
             profile_name = entry
             minecraft_version = "Unknown"
             mod_loader = None
-            
+
             if manifest and isinstance(manifest, dict):
                 profile_name = manifest.get("name", entry)
                 mc_info = manifest.get("minecraft", {})
@@ -74,21 +76,26 @@ def list_profiles() -> List[Dict[str, Any]]:
             mods_dir = os.path.join(entry_path, "mods")
             if os.path.isdir(mods_dir):
                 for f_name in os.listdir(mods_dir):
-                    if f_name.lower().endswith(".jar") and os.path.isfile(os.path.join(mods_dir, f_name)):
+                    if f_name.lower().endswith(".jar") and os.path.isfile(
+                        os.path.join(mods_dir, f_name)
+                    ):
                         mods_count += 1
 
-            profiles.append({
-                "id": entry,
-                "name": profile_name,
-                "minecraftVersion": minecraft_version,
-                "modLoader": mod_loader,
-                "modsCount": mods_count
-            })
+            profiles.append(
+                {
+                    "id": entry,
+                    "name": profile_name,
+                    "minecraftVersion": minecraft_version,
+                    "modLoader": mod_loader,
+                    "modsCount": mods_count,
+                }
+            )
     except Exception as e:
         print(f"Error listing instances directory: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
     return profiles
+
 
 def remove_temp_file(path: str):
     try:
@@ -96,11 +103,12 @@ def remove_temp_file(path: str):
     except Exception as e:
         print(f"Failed to remove temp file {path}: {e}")
 
+
 @app.get("/profiles/{profile_id}/download")
 def download_profile(profile_id: str, background_tasks: BackgroundTasks):
     instances_dir = get_instances_dir()
     target_dir = os.path.abspath(os.path.join(instances_dir, profile_id))
-    
+
     # Traversal security check
     if not target_dir.startswith(instances_dir):
         raise HTTPException(status_code=400, detail="Invalid profile ID")
@@ -110,48 +118,49 @@ def download_profile(profile_id: str, background_tasks: BackgroundTasks):
 
     instance_json_path = os.path.join(target_dir, "minecraftinstance.json")
     if not os.path.isfile(instance_json_path):
-        raise HTTPException(status_code=404, detail="minecraftinstance.json not found in profile")
+        raise HTTPException(
+            status_code=404, detail="minecraftinstance.json not found in profile"
+        )
 
     try:
         with open(instance_json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read minecraftinstance.json: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to read minecraftinstance.json: {e}"
+        )
 
     manifest = data.get("manifest")
-    
+
     # Synthesize manifest if it is null
     if not manifest or not isinstance(manifest, dict):
         base_loader = data.get("baseModLoader")
         loaders_list = []
         if base_loader and isinstance(base_loader, dict) and base_loader.get("name"):
-            loaders_list.append({
-                "id": base_loader.get("name"),
-                "primary": True
-            })
-            
+            loaders_list.append({"id": base_loader.get("name"), "primary": True})
+
         manifest = {
             "minecraft": {
                 "version": data.get("gameVersion", "Unknown"),
-                "modLoaders": loaders_list
+                "modLoaders": loaders_list,
             },
             "manifestType": "minecraftModpack",
             "manifestVersion": 1,
             "name": data.get("name", profile_id),
             "version": "1.0",
             "author": data.get("customAuthor") or "User",
-            "files": []
+            "files": [],
         }
 
     # Create temporary zip archive
     try:
         temp_fd, temp_zip_path = tempfile.mkstemp(suffix=".zip")
-        os.close(temp_fd) # Close file descriptor so zipfile can open it
-        
+        os.close(temp_fd)  # Close file descriptor so zipfile can open it
+
         with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             # Write manifest.json
             z.writestr("manifest.json", json.dumps(manifest, indent=2))
-            
+
             # Write mods folder files
             mods_dir = os.path.join(target_dir, "mods")
             if os.path.isdir(mods_dir):
@@ -169,7 +178,5 @@ def download_profile(profile_id: str, background_tasks: BackgroundTasks):
 
     safe_filename = f"{profile_id.replace(' ', '_')}.zip"
     return FileResponse(
-        path=temp_zip_path,
-        media_type="application/zip",
-        filename=safe_filename
+        path=temp_zip_path, media_type="application/zip", filename=safe_filename
     )
