@@ -50,26 +50,13 @@ def list_profiles() -> List[Dict[str, Any]]:
                 print(f"Error loading JSON from {instance_json_path}: {e}")
                 continue
 
-            manifest = data.get("manifest")
-
             # Extract basic details
-            profile_name = entry
-            minecraft_version = "Unknown"
-            mod_loader = None
+            profile_name = data.get("name", entry)
+            minecraft_version = data.get("gameVersion", "Unknown")
+            mod_loader = data.get("baseModLoader", {}).get("name", None)
 
-            if manifest and isinstance(manifest, dict):
-                profile_name = manifest.get("name", entry)
-                mc_info = manifest.get("minecraft", {})
-                minecraft_version = mc_info.get("version", "Unknown")
-                mod_loaders = mc_info.get("modLoaders", [])
-                if mod_loaders and isinstance(mod_loaders, list):
-                    mod_loader = mod_loaders[0].get("id")
-            else:
-                profile_name = data.get("name", entry)
-                minecraft_version = data.get("gameVersion", "Unknown")
-                base_loader = data.get("baseModLoader")
-                if base_loader and isinstance(base_loader, dict):
-                    mod_loader = base_loader.get("name")
+            if mod_loader and mod_loader.endswith(f"-{minecraft_version}"):
+                mod_loader = mod_loader.rpartition("-")[0]
 
             # Count mod JAR files
             mods_count = 0
