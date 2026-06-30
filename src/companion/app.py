@@ -53,20 +53,23 @@ def list_profiles() -> List[Dict[str, Any]]:
             # Extract basic details
             profile_name = data.get("name", entry)
             minecraft_version = data.get("gameVersion", "Unknown")
-            mod_loader = data.get("baseModLoader", {}).get("name", None)
-
-            if mod_loader and mod_loader.endswith(f"-{minecraft_version}"):
-                mod_loader = mod_loader.rpartition("-")[0]
-
-            # Count mod JAR files
+            base_mod_loader = data.get("baseModLoader")
             mods_count = 0
-            mods_dir = os.path.join(entry_path, "mods")
-            if os.path.isdir(mods_dir):
-                for f_name in os.listdir(mods_dir):
-                    if f_name.lower().endswith(".jar") and os.path.isfile(
-                        os.path.join(mods_dir, f_name)
-                    ):
-                        mods_count += 1
+
+            if base_mod_loader:
+                mod_loader = base_mod_loader.get("name", None)
+                if mod_loader and mod_loader.endswith(f"-{minecraft_version}"):
+                    mod_loader = mod_loader.rpartition("-")[0]
+                # Count mod JAR files
+                mods_dir = os.path.join(entry_path, "mods")
+                if os.path.isdir(mods_dir):
+                    for f_name in os.listdir(mods_dir):
+                        if f_name.lower().endswith(".jar") and os.path.isfile(
+                            os.path.join(mods_dir, f_name)
+                        ):
+                            mods_count += 1
+            else:
+                mod_loader = None
 
             profiles.append(
                 {
