@@ -26,6 +26,13 @@ app.add_middleware(
 
 logger = logging.getLogger(__name__)
 
+API_VERSION = "1"
+
+
+@app.get("/version")
+def get_version():
+    return {"apiVersion": API_VERSION}
+
 
 def get_instances_dir() -> str:
     path = os.environ.get("COMPANION_INSTANCES_DIR")
@@ -192,11 +199,13 @@ def restart():
 
     def self_destruct():
         import time
+
         time.sleep(0.5)
         # Exit with a special code (100) indicating a restart request
         os._exit(100)
 
     import threading
+
     threading.Thread(target=self_destruct, daemon=True).start()
     return {"status": "restarting"}
 
