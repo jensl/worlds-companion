@@ -38,7 +38,8 @@ def read_instance_json(instance_dir: str) -> dict[str, Any] | None:
             data = json.load(f)
     except Exception as e:
         print(f"Error loading JSON from {instance_json_path}: {e}")
-        return None
+        # return None
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @dataclass
