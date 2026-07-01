@@ -86,17 +86,16 @@ def list_profiles() -> List[Dict[str, Any]]:
     profiles = []
     try:
         for entry in os.listdir(instances_dir):
-            profile = Profile.read(os.path.join(instances_dir, entry))
-
-            profiles.append(
-                {
-                    "id": entry,
-                    "name": profile.name,
-                    "minecraftVersion": profile.minecraft_version,
-                    "modLoader": profile.mod_loader,
-                    "modsCount": profile.mods_count,
-                }
-            )
+            if profile := Profile.read(os.path.join(instances_dir, entry)):
+                profiles.append(
+                    {
+                        "id": entry,
+                        "name": profile.name,
+                        "minecraftVersion": profile.minecraft_version,
+                        "modLoader": profile.mod_loader,
+                        "modsCount": profile.mods_count,
+                    }
+                )
     except Exception as e:
         print(f"Error listing instances directory: {e}")
         raise HTTPException(status_code=500, detail=str(e))
