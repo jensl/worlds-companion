@@ -1,7 +1,36 @@
+from io import StringIO
 import argparse
+import logging
 import os
 import sys
 import uvicorn
+
+
+LOG_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
+        "access": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
+    },
+    "handlers": {
+        "default": {
+            "formatter": "default",
+            "class": logging.StreamHandler,
+            "stream": "ext://sys.stderr",
+        },
+        "access": {
+            "formatter": "access",
+            "class": logging.StreamHandler,
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "loggers": {
+        "uvicorn.error": {"level": "INFO", "handlers": ["default"], "propagate": "no"},
+        "uvicorn.access": {"level": "INFO", "handlers": ["access"], "propagate": "no"},
+    },
+    "root": {"level": "DEBUG", "handlers": ["default"], "propagate": "no"},
+}
 
 
 def install_startup(args: argparse.Namespace, instances_path: str) -> None:
@@ -29,7 +58,9 @@ def install_startup(args: argparse.Namespace, instances_path: str) -> None:
 
     vbs_content = (
         f'Set WshShell = CreateObject("WScript.Shell")\n'
-        f'WshShell.Run "{command.replace('"', '""')}", 0, False\n'
+        f'Do\n'
+        f'    exitCode = WshShell.Run("{command.replace('"', '""')}", 0, True)\n'
+        f'Loop While exitCode = 100\n'
     )
 
     try:
@@ -100,6 +131,12 @@ def main() -> None:
     if args.command == "serve":
         print(f"Starting companion daemon on http://{args.host}:{args.port}")
         print(f"Curseforge Instances path: {instances_path}")
-        uvicorn.run("companion.app:app", host=args.host, port=args.port, reload=False)
+        uvicorn.run(
+            "companion.app:app",
+            host=args.host,
+            port=args.port,
+            reload=False,
+            log_config=LOG_CONFIG,
+        )
     elif args.command == "install":
         install_startup(args, instances_path)
