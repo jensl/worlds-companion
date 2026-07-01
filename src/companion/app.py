@@ -26,7 +26,7 @@ app.add_middleware(
 
 logger = logging.getLogger(__name__)
 
-API_VERSION = "1"
+API_VERSION = "2"
 
 
 @app.get("/version")
