@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 import os
 import tempfile
@@ -26,6 +27,56 @@ def get_instances_dir() -> str:
     return os.path.abspath(path)
 
 
+def read_instance_json(instance_dir: str) -> dict[str, Any] | None:
+    instance_json_path = os.path.join(instance_dir, "minecraftinstance.json")
+
+    if not os.path.isfile(instance_json_path):
+        return None
+
+    try:
+        with open(instance_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"Error loading JSON from {instance_json_path}: {e}")
+        return None
+
+
+@dataclass
+class Profile:
+    name: str
+    minecraft_version: str  # e.g. "26.2"
+    mod_loader: str | None  # e.g. "forge-65.0.1"
+    mods_count: int
+
+    @staticmethod
+    def read(instance_dir: str) -> Profile | None:
+        data = read_instance_json(instance_dir)
+        if data is None:
+            return None
+
+        profile_name = data.get("name")
+        minecraft_version = data.get("gameVersion")
+        base_mod_loader = data.get("baseModLoader")
+        mods_count = 0
+
+        if base_mod_loader:
+            mod_loader = base_mod_loader.get("name", None)
+            if mod_loader and mod_loader.endswith(f"-{minecraft_version}"):
+                mod_loader = mod_loader.rpartition("-")[0]
+            # Count mod JAR files
+            mods_dir = os.path.join(instance_dir, "mods")
+            if os.path.isdir(mods_dir):
+                for f_name in os.listdir(mods_dir):
+                    if f_name.lower().endswith(".jar") and os.path.isfile(
+                        os.path.join(mods_dir, f_name)
+                    ):
+                        mods_count += 1
+        else:
+            mod_loader = None
+
+        return Profile(profile_name, minecraft_version, mod_loader, mods_count)
+
+
 @app.get("/profiles")
 def list_profiles() -> List[Dict[str, Any]]:
     instances_dir = get_instances_dir()
@@ -35,49 +86,15 @@ def list_profiles() -> List[Dict[str, Any]]:
     profiles = []
     try:
         for entry in os.listdir(instances_dir):
-            entry_path = os.path.join(instances_dir, entry)
-            if not os.path.isdir(entry_path):
-                continue
-
-            instance_json_path = os.path.join(entry_path, "minecraftinstance.json")
-            if not os.path.isfile(instance_json_path):
-                continue
-
-            try:
-                with open(instance_json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception as e:
-                print(f"Error loading JSON from {instance_json_path}: {e}")
-                continue
-
-            # Extract basic details
-            profile_name = data.get("name", entry)
-            minecraft_version = data.get("gameVersion", "Unknown")
-            base_mod_loader = data.get("baseModLoader")
-            mods_count = 0
-
-            if base_mod_loader:
-                mod_loader = base_mod_loader.get("name", None)
-                if mod_loader and mod_loader.endswith(f"-{minecraft_version}"):
-                    mod_loader = mod_loader.rpartition("-")[0]
-                # Count mod JAR files
-                mods_dir = os.path.join(entry_path, "mods")
-                if os.path.isdir(mods_dir):
-                    for f_name in os.listdir(mods_dir):
-                        if f_name.lower().endswith(".jar") and os.path.isfile(
-                            os.path.join(mods_dir, f_name)
-                        ):
-                            mods_count += 1
-            else:
-                mod_loader = None
+            profile = Profile.read(os.path.join(instances_dir, entry))
 
             profiles.append(
                 {
                     "id": entry,
-                    "name": profile_name,
-                    "minecraftVersion": minecraft_version,
-                    "modLoader": mod_loader,
-                    "modsCount": mods_count,
+                    "name": profile.name,
+                    "minecraftVersion": profile.minecraft_version,
+                    "modLoader": profile.mod_loader,
+                    "modsCount": profile.mods_count,
                 }
             )
     except Exception as e:
